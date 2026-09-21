@@ -1,0 +1,6 @@
+- can i create my own phrase list?
+- need to put this online at xtidy for now
+- need image for phrases that are not parsed from youtube
+- need to test on english phrases as well
+- need to put media-tools on its own repo and remove teh study guide package
+- 
