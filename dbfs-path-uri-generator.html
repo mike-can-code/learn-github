@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Databricks DBFS Path & URI Generator</title>
+  <!-- Tailwind CSS via CDN (dark-mode-first utility styling) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    /* Optional: fine-tune scrollbar styling for dark mode */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #020617;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #334155;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center py-10">
+  <div class="max-w-5xl w-full px-4">
+    <!-- Shell card -->
+    <div class="rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl shadow-black/50 p-6 md:p-8 space-y-6">
+      <!-- Header -->
+      <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 class="text-xl md:text-2xl font-semibold tracking-tight">
+            Databricks DBFS Path & URI Generator
+          </h1>
+          <p class="mt-1 text-sm text-slate-400 max-w-2xl">
+            Paste any cloud URI, DBFS path, <code class="text-xs bg-slate-800/80 px-1.5 py-0.5 rounded">/dbfs</code> path, or
+            mount path. This tool normalizes it and generates ready-to-use snippets for common Databricks workflows.
+          </p>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-slate-400">
+          <span class="inline-flex items-center gap-1 rounded-full bg-slate-900/90 px-3 py-1 border border-slate-700">
+            <span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>Client-side only • No network calls</span>
+          </span>
+        </div>
+      </header>
+
+      <!-- Input section -->
+      <section class="space-y-3">
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <label for="path-input" class="text-xs font-medium text-slate-300 uppercase tracking-wide">
+              Input path or URI
+            </label>
+            <p class="text-xs text-slate-400 mt-0.5">
+              Examples:
+              <span class="font-mono">s3://my-bucket/path/to/data/</span>,
+              <span class="font-mono">abfss://container@account.dfs.core.windows.net/path/</span>,
+              <span class="font-mono">dbfs:/mnt/my-mount/data/</span>,
+              <span class="font-mono">/dbfs/mnt/my-mount/data/</span>,
+              <span class="font-mono">/mnt/my-mount/data/</span>.
+            </p>
+          </div>
+          <button
+            type="button"
+            onclick="clearAll()"
+            class="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-900/80 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800/90 hover:border-slate-500 transition-colors"
+          >
+            <span class="h-3 w-3 rounded-full border border-slate-500 flex items-center justify-center text-[0.6rem]">
+              ×
+            </span>
+            <span>Clear</span>
+          </button>
+        </div>
+
+        <div class="relative">
+          <input
+            id="path-input"
+            type="text"
+            spellcheck="false"
+            autocomplete="off"
+            placeholder="Paste or type a DBFS path, /dbfs path, mount path, or cloud URI..."
+            class="w-full rounded-xl border border-slate-700 bg-slate-900/80 px-3.5 py-2.5 pr-12 text-sm font-mono text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+            oninput="handleInputChange()"
+          />
+          <div class="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+            <span class="text-[0.7rem] uppercase tracking-wide text-slate-500 bg-slate-900/80 px-2 py-1 rounded-full border border-slate-700">
+              Live
+            </span>
+          </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+          <div class="flex items-center gap-2">
+            <span class="inline-flex items-center gap-1 rounded-full bg-slate-900/80 px-2 py-1 border border-slate-800 text-slate-300">
+              <span class="h-1.5 w-1.5 rounded-full bg-sky-400"></span>
+              <span id="parse-info">Awaiting input...</span>
+            </span>
+          </div>
+          <div id="parse-warning" class="text-[0.7rem] text-amber-300/80"></div>
+        </div>
+      </section>
+
+      <!-- Output section -->
+      <section class="space-y-4">
+        <h2 class="text-sm font-semibold text-slate-200">
+          Generated formats
+        </h2>
+
+        <!-- Grid of outputs -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- DBFS URI -->
+          <article class="rounded-xl border border-slate-800 bg-slate-900/80 p-3.5 space-y-2">
+            <header class="flex items-start justify-between gap-2">
+              <div>
+                <h3 class="text-xs font-semibold text-slate-200">
+                  DBFS URI (standard)
+                </h3>
+                <p class="text-[0.7rem] text-slate-400 mt-0.5">
+                  Use with Databricks APIs that expect a <code class="font-mono">dbfs:/</code> path.
+                </p>
+              </div>
+              <button
+                type="button"
+                class="copy-btn inline-flex items-center gap-1 rounded-full border border-slate-700 bg-slate-800/80 px-2.5 py-1 text-[0.7rem] text-slate-200 hover:bg-slate-700 transition-colors"
+                onclick="copyFromElement('output-dbfs-uri', this)"
+              >
+                <span class="material-symbols-outlined text-[0.9rem]">📋</span>
+                <span>Copy</span>
+              </button>
+            </header>
+            <pre
+              id="output-dbfs-uri"
+              class="mt-1 text-xs font-mono text-sky-300 bg-slate-900/90 border border-slate-800 rounded-lg px-2.5 py-2 overflow-x-auto"
+            >dbfs:/mnt/my-mount/data/</pre>
+          </article>
+
+          <!-- Spark Local File API -->
+          <article class="rounded-xl border border-slate-800 bg-slate-900/80 p-3.5 space-y-2">
+            <header class="flex items-start justify-between gap-2">
+              <div>
+                <h3 class="text-xs font-semibold text-slate-200">
+                  Spark Local File API (/dbfs path)
+                </h3>
+                <p class="text-[0.7rem] text-slate-400 mt-0.5">
+                  Use with Python <code class="font-mono">open</code>, <code class="font-mono">os</code>, or other POSIX-style file operations on Databricks.
+                </p>
+              </div>
+              <button
+                type="button"
+                class="copy-btn inline-flex items-center gap-1 rounded-full border border-slate-700 bg-slate-800/80 px-2.5 py-1 text-[0.7rem] text-slate-200 hover:bg-slate-700 transition-colors"
+                onclick="copyFromElement('output-posix-path', this)"
+              >
+                <span class="material-symbols-outlined text-[0.9rem]">📋</span>
+                <span>Copy</span>
+              </button>
+            </header>
+            <pre
+              id="output-posix-path"
+              class="mt-1 text-xs font-mono text-sky-300 bg-slate-900/90 border border-slate-800 rounded-lg px-2.5 py-2 overflow-x-auto"
+            >/dbfs/mnt/my-mount/data/</pre>
+          </article>
+
+          <!-- dbutils.fs snippet -->
+          <article class="rounded-xl border border-slate-800 bg-slate-900/80 p-3.5 space-y-2">
+            <header class="flex items-start justify-between gap-2">
+              <div>
+                <h3 class="text-xs font-semibold text-slate-200">
+                  Databricks Utilities (<code class="font-mono">dbutils</code>)
+                </h3>
+                <p class="text-[0.7rem] text-slate-400 mt-0.5">
+                  Use in notebooks to list, copy, or manage files via <code class="font-mono">dbutils.fs</code>.
+                </p>
+              </div>
+              <button
+                type="button"
+                class="copy-btn inline-flex items-center gap-1 rounded-full border border-slate-700 bg-slate-800/80 px-2.5 py-1 text-[0.7rem] text-slate-200 hover:bg-slate-700 transition-colors"
+                onclick="copyFromElement('output-dbutils', this)"
+              >
+                <span class="material-symbols-outlined text-[0.9rem]">📋</span>
+                <span>Copy</span>
+              </button>
+            </header>
+            <pre
+              id="output-dbutils"
+              class="mt-1 text-xs font-mono text-sky-300 bg-slate-900/90 border border-slate-800 rounded-lg px-2.5 py-2 overflow-x-auto"
+            >dbutils.fs.ls("dbfs:/mnt/my-mount/data/")</pre>
+          </article>
+
+          <!-- Spark read API (Python) -->
+          <article class="rounded-xl border border-slate-800 bg-slate-900/80 p-3.5 space-y-2">
+            <header class="flex items-start justify-between gap-2">
+              <div>
+                <h3 class="text-xs font-semibold text-slate-200">
+                  Spark Read API (Python)
+                </h3>
+                <p class="text-[0.7rem] text-slate-400 mt-0.5">
+                  Ready-to-use PySpark snippet for loading a Delta table from the generated DBFS URI.
+                </p>
+              </div>
+              <button
+                type="button"
+                class="copy-btn inline-flex items-center gap-1 rounded-full border border-slate-700 bg-slate-800/80 px-2.5 py-1 text-[0.7rem] text-slate-200 hover:bg-slate-700 transition-colors"
+                onclick="copyFromElement('output-spark-read', this)"
+              >
+                <span class="material-symbols-outlined text-[0.9rem]">📋</span>
+                <span>Copy</span>
+              </button>
+            </header>
+            <pre
+              id="output-spark-read"
+              class="mt-1 text-xs font-mono text-sky-300 bg-slate-900/90 border border-slate-800 rounded-lg px-2.5 py-2 overflow-x-auto"
+            >df = spark.read.format("delta").load("dbfs:/mnt/my-mount/data/")</pre>
+          </article>
+
+          <!-- Magic command (%fs) -->
+          <article class="rounded-xl border border-slate-800 bg-slate-900/80 p-3.5 space-y-2 md:col-span-2">
+            <header class="flex items-start justify-between gap-2">
+              <div>
+                <h3 class="text-xs font-semibold text-slate-200">
+                  Databricks Magic Command (%fs)
+                </h3>
+                <p class="text-[0.7rem] text-slate-400 mt-0.5">
+                  Use inside a notebook cell with the <code class="font-mono">%fs</code> magic to inspect paths via the File System CLI.
+                </p>
+              </div>
+              <button
+                type="button"
+                class="copy-btn inline-flex items-center gap-1 rounded-full border border-slate-700 bg-slate-800/80 px-2.5 py-1 text-[0.7rem] text-slate-200 hover:bg-slate-700 transition-colors"
+                onclick="copyFromElement('output-magic', this)"
+              >
+                <span class="material-symbols-outlined text-[0.9rem]">📋</span>
+                <span>Copy</span>
+              </button>
+            </header>
+            <pre
+              id="output-magic"
+              class="mt-1 text-xs font-mono text-sky-300 bg-slate-900/90 border border-slate-800 rounded-lg px-2.5 py-2 overflow-x-auto"
+            >%fs ls dbfs:/mnt/my-mount/data/</pre>
+          </article>
+        </div>
+      </section>
+
+      <!-- Footer -->
+      <footer class="mt-4 pt-4 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-400">
+        <div class="inline-flex items-center gap-2">
+          <span>🔒 100% Secure: All processing runs locally in your browser.</span>
+        </div>
+        <div class="inline-flex items-center gap-2 text-[0.7rem]">
+          <span class="text-slate-500">Supported inputs:</span>
+          <span class="font-mono bg-slate-900/80 px-2 py-0.5 rounded-full border border-slate-700">s3://…</span>
+          <span class="font-mono bg-slate-900/80 px-2 py-0.5 rounded-full border border-slate-700">abfss://…</span>
+          <span class="font-mono bg-slate-900/80 px-2 py-0.5 rounded-full border border-slate-700">dbfs:/…</span>
+          <span class="font-mono bg-slate-900/80 px-2 py-0.5 rounded-full border border-slate-700">/dbfs/…</span>
+          <span class="font-mono bg-slate-900/80 px-2 py-0.5 rounded-full border border-slate-700">/mnt/…</span>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <script>
+    function normalizeDbfsPath(candidate) {
+      let p = (candidate || "").trim();
+
+      if (!p.startsWith("dbfs:")) {
+        p = "dbfs:" + p;
+      }
+
+      let rest = p.slice("dbfs:".length);
+
+      if (!rest) {
+        rest = "/";
+      }
+      rest = rest.replace(/^\/+/, "/");
+
+      rest = rest.replace(/\/{2,}/g, "/");
+
+      return "dbfs:" + rest;
+    }
+
+    function deriveDbfsFromInput(raw) {
+      const input = (raw || "").trim();
+      let info = "";
+      let warning = "";
+      let dbfsPath = "";
+
+      if (!input) {
+        return { dbfsPath: "", info: "Awaiting input…", warning: "" };
+      }
+
+      const lower = input.toLowerCase();
+
+      if (lower.startsWith("dbfs:/")) {
+        dbfsPath = normalizeDbfsPath(input);
+        info = "Detected DBFS URI.";
+        return { dbfsPath, info, warning };
+      }
+
+      if (lower.startsWith("/dbfs/")) {
+        let pathPart = input.slice("/dbfs".length);
+        if (!pathPart.startsWith("/")) {
+          pathPart = "/" + pathPart;
+        }
+        dbfsPath = normalizeDbfsPath("dbfs:" + pathPart);
+        info = "Detected Spark local /dbfs path.";
+        return { dbfsPath, info, warning };
+      }
+
+      if (lower.startsWith("/mnt/")) {
+        dbfsPath = normalizeDbfsPath("dbfs:" + input);
+        info = "Detected DBFS mount path (/mnt/…).";
+        return { dbfsPath, info, warning };
+      }
+
+      if (lower.startsWith("mnt/")) {
+        dbfsPath = normalizeDbfsPath("dbfs:/" + input);
+        info = "Detected mount path (mnt/…).";
+        return { dbfsPath, info, warning };
+      }
+
+      const s3Match = input.match(/^s3:\/\/([^\/]+)(\/.*)?$/i);
+      if (s3Match) {
+        const bucket = s3Match[1];
+        let subPath = s3Match[2] || "";
+
+        subPath = subPath.replace(/\/{2,}/g, "/");
+        if (subPath && !subPath.startsWith("/")) {
+          subPath = "/" + subPath;
+        }
+
+        const mountPath = "/mnt/" + bucket + subPath;
+        dbfsPath = normalizeDbfsPath("dbfs:" + mountPath);
+        info = "Detected S3 URI.";
+        warning =
+          "Approximate DBFS mount path inferred from S3 bucket name. Verify that '/mnt/" +
+          bucket +
+          "' matches your actual mount alias.";
+        return { dbfsPath, info, warning };
+      }
+
+      const abfssMatch = input.match(/^abfss:\/\/([^@\/]+)@[^\/]+(\/.*)?$/i);
+      if (abfssMatch) {
+        const container = abfssMatch[1];
+        let subPath = abfssMatch[2] || "";
+
+        subPath = subPath.replace(/\/{2,}/g, "/");
+        if (subPath && !subPath.startsWith("/")) {
+          subPath = "/" + subPath;
+        }
+
+        const mountPath = "/mnt/" + container + subPath;
+        dbfsPath = normalizeDbfsPath("dbfs:" + mountPath);
+        info = "Detected ADLS Gen2 URI (abfss).";
+        warning =
+          "Approximate DBFS mount path inferred from container name. Verify that '/mnt/" +
+          container +
+          "' matches your actual mount alias.";
+        return { dbfsPath, info, warning };
+      }
+
+      const abfsMatch = input.match(/^abfs:\/\/([^@\/]+)@[^\/]+(\/.*)?$/i);
+      if (abfsMatch) {
+        const container = abfsMatch[1];
+        let subPath = abfsMatch[2] || "";
+
+        subPath = subPath.replace(/\/{2,}/g, "/");
+        if (subPath && !subPath.startsWith("/")) {
+          subPath = "/" + subPath;
+        }
+
+        const mountPath = "/mnt/" + container + subPath;
+        dbfsPath = normalizeDbfsPath("dbfs:" + mountPath);
+        info = "Detected ADLS Gen2-style URI (abfs).";
+        warning =
+          "Approximate DBFS mount path inferred from container name. Verify that '/mnt/" +
+          container +
+          "' matches your actual mount alias.";
+        return { dbfsPath, info, warning };
+      }
+
+      info = "Could not automatically derive a DBFS path from input.";
+      warning =
+        "Unsupported or ambiguous format. Please provide a DBFS URI, /dbfs path, /mnt path, or a supported cloud URI.";
+      return { dbfsPath: "", info, warning };
+    }
+
+    function handleInputChange() {
+      const inputEl = document.getElementById("path-input");
+      const raw = inputEl.value || "";
+      const { dbfsPath, info, warning } = deriveDbfsFromInput(raw);
+
+      const infoEl = document.getElementById("parse-info");
+      const warningEl = document.getElementById("parse-warning");
+
+      infoEl.textContent = info;
+      warningEl.textContent = warning || "";
+
+      const dbfsUriEl = document.getElementById("output-dbfs-uri");
+      const posixEl = document.getElementById("output-posix-path");
+      const dbutilsEl = document.getElementById("output-dbutils");
+      const sparkReadEl = document.getElementById("output-spark-read");
+      const magicEl = document.getElementById("output-magic");
+
+      if (!raw.trim()) {
+        dbfsUriEl.textContent = "dbfs:/mnt/my-mount/data/";
+        posixEl.textContent = "/dbfs/mnt/my-mount/data/";
+        dbutilsEl.textContent = 'dbutils.fs.ls("dbfs:/mnt/my-mount/data/")';
+        sparkReadEl.textContent = 'df = spark.read.format("delta").load("dbfs:/mnt/my-mount/data/")';
+        magicEl.textContent = "%fs ls dbfs:/mnt/my-mount/data/";
+        return;
+      }
+
+      if (!dbfsPath) {
+        dbfsUriEl.textContent = "Unable to derive DBFS path from input.";
+        posixEl.textContent = "";
+        dbutilsEl.textContent = "";
+        sparkReadEl.textContent = "";
+        magicEl.textContent = "";
+        return;
+      }
+
+      dbfsUriEl.textContent = dbfsPath;
+
+      let posixPath = "/dbfs" + dbfsPath.slice("dbfs:".length);
+      posixPath = posixPath.replace(/^\/dbfs\/+/, "/dbfs/");
+      posixEl.textContent = posixPath;
+
+      dbutilsEl.textContent = 'dbutils.fs.ls("' + dbfsPath + '")';
+
+      sparkReadEl.textContent = 'df = spark.read.format("delta").load("' + dbfsPath + '")';
+
+      magicEl.textContent = "%fs ls " + dbfsPath;
+    }
+
+    function clearAll() {
+      const inputEl = document.getElementById("path-input");
+      inputEl.value = "";
+      handleInputChange();
+    }
+
+    function copyFromElement(elementId, buttonEl) {
+      const el = document.getElementById(elementId);
+      if (!el) return;
+      const text = (el.textContent || el.innerText || "").trim();
+      if (!text) return;
+
+      copyTextToClipboard(text, buttonEl);
+    }
+
+    function copyTextToClipboard(text, buttonEl) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard
+          .writeText(text)
+          .then(function () {
+            showCopiedState(buttonEl);
+          })
+          .catch(function () {
+            fallbackCopyText(text, buttonEl);
+          });
+      } else {
+        fallbackCopyText(text, buttonEl);
+      }
+    }
+
+    function fallbackCopyText(text, buttonEl) {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.top = "-1000px";
+      textarea.style.left = "-1000px";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      try {
+        document.execCommand("copy");
+      } catch (e) {
+        console.error("Clipboard copy failed", e);
+      }
+      document.body.removeChild(textarea);
+      showCopiedState(buttonEl);
+    }
+
+    function showCopiedState(buttonEl) {
+      if (!buttonEl) return;
+      const originalText = buttonEl.dataset.originalText || buttonEl.innerText;
+      buttonEl.dataset.originalText = originalText;
+
+      buttonEl.innerText = "✓ Copied!";
+      buttonEl.classList.add("bg-emerald-600", "border-emerald-400", "text-slate-50");
+      buttonEl.classList.remove("bg-slate-800/80");
+
+      setTimeout(function () {
+        buttonEl.innerText = originalText;
+        buttonEl.classList.remove("bg-emerald-600", "border-emerald-400", "text-slate-50");
+        buttonEl.classList.add("bg-slate-800/80");
+      }, 1400);
+    }
+
+    window.addEventListener("DOMContentLoaded", function () {
+      handleInputChange();
+    });
+  </script>
+</body>
+</html>
